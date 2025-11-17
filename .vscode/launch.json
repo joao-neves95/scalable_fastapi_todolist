@@ -5,15 +5,59 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python Debugger: FastAPI",
+            "name": "Auth API - Attach to docker container",
             "type": "debugpy",
-            "request": "launch",
-            "module": "uvicorn",
-            "args": [
-                "main:app",
-                "--reload"
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5678
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/app"
+                },
             ],
-            "jinja": true
+        },
+        {
+            "name": "Users API - Attach to docker container",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5679
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/app"
+                },
+            ],
+        },
+        {
+            "name": "Todo API - Attach to docker container",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "host": "127.0.0.1",
+                "port": 5680
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "/app"
+                },
+            ],
+        },
+    ],
+    "compounds": [
+        {
+            "name": "Attach to all docker-compose containers",
+            "configurations": [
+                "Auth API - Attach to docker container",
+                "Users API - Attach to docker container",
+                "Todo API - Attach to docker container"
+            ]
         }
     ]
 }

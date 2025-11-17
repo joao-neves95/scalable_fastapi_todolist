@@ -1,0 +1,63 @@
+services:
+  auth_api:
+    container_name: auth_api
+    build:
+      context: .
+      dockerfile: auth_api/Dockerfile.debug
+    ports:
+      - "8000:8000"
+      - 5678:5678
+    volumes:
+      - auth_api_data:/app
+    develop:
+      watch:
+        - action: sync
+          path: ./auth_api
+          target: /app
+          ignore:
+            - .venv/
+
+  users_api:
+    container_name: users_api
+    depends_on:
+      - auth_api
+    build:
+      context: .
+      dockerfile: users_api/Dockerfile.debug
+    ports:
+      - "8001:8000"
+      - 5679:5678
+    volumes:
+      - users_api_data:/app
+    develop:
+      watch:
+        - action: sync
+          path: ./users_api
+          target: /app
+          ignore:
+            - .venv/
+
+  todo_api:
+    container_name: todo_api
+    depends_on:
+      - users_api
+    build:
+      context: .
+      dockerfile: todo_api/Dockerfile.debug
+    ports:
+      - "8002:8000"
+      - 5680:5678
+    volumes:
+      - todo_api_data:/app
+    develop:
+      watch:
+        - action: sync
+          path: ./users_api
+          target: /app
+          ignore:
+            - .venv/
+
+volumes:
+  auth_api_data:
+  users_api_data:
+  todo_api_data:
