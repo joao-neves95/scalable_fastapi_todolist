@@ -11,7 +11,7 @@ from routers.auth import api_auth_router
 async def lifespan(app: FastAPI):
     async with RegisterTortoise(
         app=app,
-        modules={"entities": ["data.entities.data_user"]},
+        modules={"entities": ["auth_api.data.entities.data_user_credentials"]},
         db_url=f"sqlite:///{os.path.abspath('db.sqlite3')}",
         # Use UTC.
         use_tz=True,

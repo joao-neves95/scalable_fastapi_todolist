@@ -8,7 +8,7 @@ app = FastAPI(
     lifespan=app_lifespan(
         modules={
             "entities": [
-                "data.entities.data_user",
+                "users_api.data.entities.data_user",
             ]
         }
     ),
