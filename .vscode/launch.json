@@ -5,6 +5,21 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Auth API - Python Debugger",
+            "type": "debugpy",
+            "request": "launch",
+            "python": "${workspaceFolder}/auth_api/.venv/bin/python",
+            "module": "uvicorn",
+            "args": [
+                "main:app",
+                "--reload",
+                "--app-dir",
+                "auth_api"
+            ],
+            "envFile": "${workspaceFolder}/.env",
+            "jinja": true
+        },
+        {
             "name": "Auth API - Attach to docker container",
             "type": "debugpy",
             "request": "attach",

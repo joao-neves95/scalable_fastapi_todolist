@@ -4,11 +4,15 @@ services:
     build:
       context: .
       dockerfile: auth_api/Dockerfile.debug
+    env_file:
+      - .env
     ports:
       - "8000:8000"
       - 5678:5678
+    networks:
+      - todolist_backend
     volumes:
-      - auth_api_data:/app
+      - auth_api_data:/app/auth_api/data/db
     develop:
       watch:
         - action: sync
@@ -24,11 +28,15 @@ services:
     build:
       context: .
       dockerfile: users_api/Dockerfile.debug
+    env_file:
+      - .env
     ports:
       - "8001:8000"
       - 5679:5678
+    networks:
+      - todolist_backend
     volumes:
-      - users_api_data:/app
+      - users_api_data:/app/users_api/data/db
     develop:
       watch:
         - action: sync
@@ -44,18 +52,26 @@ services:
     build:
       context: .
       dockerfile: todo_api/Dockerfile.debug
+    env_file:
+      - .env
     ports:
       - "8002:8000"
       - 5680:5678
+    networks:
+      - todolist_backend
     volumes:
-      - todo_api_data:/app
+      - todo_api_data:/app/todo_api/data/db
     develop:
       watch:
         - action: sync
-          path: ./users_api
+          path: ./todo_api
           target: /app
           ignore:
             - .venv/
+
+networks:
+  todolist_backend:
+    driver: bridge
 
 volumes:
   auth_api_data:

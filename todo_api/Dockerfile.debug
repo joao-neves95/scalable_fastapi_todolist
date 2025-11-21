@@ -25,13 +25,6 @@ WORKDIR /app
 # https://hub.docker.com/r/astral/uv
 COPY --from=docker.io/astral/uv:latest /uv /uvx /bin/
 
-# Install dependencies.
-# https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=todo_api/uv.lock,target=/app/uv.lock \
-    --mount=type=bind,source=todo_api/pyproject.toml,target=/app/pyproject.toml \
-    uv sync --frozen --no-install-project
-
 # Copy the project into the image.
 COPY shared ./shared
 COPY todo_api ./todo_api
@@ -46,9 +39,8 @@ RUN adduser -u 5678 --disabled-password --gecos "" appuser && chown -R appuser /
 USER appuser
 
 # Sync the project
-# Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
-RUN --mount=type=cache,target=/root/.cache/uv \
-    uv sync
+# Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-a-project
+RUN uv sync --locked
 
 # To debug through VSCode.
 RUN uv add debugpy

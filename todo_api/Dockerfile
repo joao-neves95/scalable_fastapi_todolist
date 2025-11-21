@@ -1,5 +1,6 @@
 FROM python:3.14-slim
 
+# Turns off buffering for easier container logging
 ENV PYTHONUNBUFFERED=1
 
 # Activate the project virtual environment by placing its binary directory at the front of the path.
@@ -26,7 +27,7 @@ COPY --from=docker.io/astral/uv:latest /uv /uvx /bin/
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=todo_api/uv.lock,target=/app/uv.lock \
     --mount=type=bind,source=todo_api/pyproject.toml,target=/app/pyproject.toml \
-    uv sync --frozen --no-install-project
+    uv sync --frozen --no-install-project --no-dev
 
 # Copy the project into the image.
 COPY shared ./shared
