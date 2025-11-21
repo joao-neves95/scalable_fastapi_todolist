@@ -2,7 +2,7 @@ from datetime import timedelta
 from typing import Annotated
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Path, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt import InvalidTokenError
 from pydantic import AfterValidator
@@ -18,11 +18,8 @@ from shared.clients.users_client import (
     create_user_with_client_async,
     delete_user_with_client_async,
 )
-from shared.lib.constants import (
-    JWT_EXPIRE_MINUTES,
-)
+from shared.lib.application_variables import ApplicationVariables
 from shared.lib.crypto import hash_password, verify_password
-from shared.lib.fastapi_utils import request_is_internal_api_key_valid
 from shared.lib.HTTPException_utils import (
     email_already_exists_exception,
     invalid_credentials_exception,
@@ -46,7 +43,7 @@ from shared.models.status_response_dto import StatusResponse
 
 api_auth_router = APIRouter(prefix="/auth")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/openapi/logins")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/logins/openapi")
 
 
 def get_is_user_jwt_admin(token: Annotated[str, Depends(oauth2_scheme)]) -> bool:
@@ -85,9 +82,9 @@ async def get_jwt_user_credentials_async(
 @api_auth_router.get("/{ulid}")
 async def get_user_credentials(
     ulid: Annotated[str, Path(), AfterValidator(validate_str_ulid)],
-    request: Request,
+    x_internal_api_key: Annotated[str, Header()],
 ) -> StatusResponse[UserCredentials]:
-    if not request_is_internal_api_key_valid(request):
+    if x_internal_api_key != ApplicationVariables.INTERNAL_API_KEY():
         raise HTTPException(status_code=403, detail="Forbidden")
 
     data_user_credentials = await select_user_credentials_by_user_ulid_async(ulid)
@@ -105,10 +102,12 @@ async def get_user_credentials(
     )
 
 
-@api_auth_router.post("/")
+@api_auth_router.post("/", status_code=status.HTTP_201_CREATED)
 async def create_user(register_user_model: RegisterUser) -> StatusResponse:
-    data_user = await select_user_credentials_by_email_async(register_user_model.email)
-    if data_user is not None:
+    data_user_credentials = await select_user_credentials_by_email_async(
+        register_user_model.email
+    )
+    if data_user_credentials is not None:
         raise email_already_exists_exception
 
     async with in_transaction():
@@ -130,11 +129,11 @@ async def create_user(register_user_model: RegisterUser) -> StatusResponse:
             except Exception as e:
                 if new_user is not None and new_user_ulid is not None:
                     await delete_user_with_client_async(client, new_user_ulid)
-                    raise e
+                raise e
 
     if new_user is None:
-        return StatusResponse(
-            status_code=500, message="An error occurred. User not created"
+        raise HTTPException(
+            status_code=500, detail="An error occurred. User not created"
         )
 
     return StatusResponse(status_code=201, message=f"User {new_user_ulid} created")
@@ -163,6 +162,19 @@ async def update_user_credentials(
     )
 
 
+@api_auth_router.post(
+    "/logins/openapi", responses={401: {"description": "Unauthorized"}}
+)
+async def login_open_api(
+    login_form_data: OAuth2PasswordRequestForm = Depends(),
+) -> JwtToken:
+    _, access_token = await login_async(
+        login_form_data.username, login_form_data.password
+    )
+
+    return JwtToken(access_token=access_token, token_type="bearer")
+
+
 @api_auth_router.post("/logins", responses={401: {"description": "Unauthorized"}})
 async def login_user(
     login_user_model: LoginUser,
@@ -179,19 +191,6 @@ async def login_user(
             token=JwtToken(access_token=access_token, token_type="bearer"),
         ),
     )
-
-
-@api_auth_router.post(
-    "/openapi/logins", responses={401: {"description": "Unauthorized"}}
-)
-async def login_open_api(
-    login_form_data: OAuth2PasswordRequestForm = Depends(),
-) -> JwtToken:
-    _, access_token = await login_async(
-        login_form_data.username, login_form_data.password
-    )
-
-    return JwtToken(access_token=access_token, token_type="bearer")
 
 
 async def login_async(email: str, password: str) -> tuple[DataUserCredentials, str]:
@@ -211,7 +210,6 @@ async def login_async(email: str, password: str) -> tuple[DataUserCredentials, s
         data_user_credentials,
         create_access_token(
             JwtTokenDataInput(sub=data_user_credentials.user_ulid, admin=True),
-            # TODO: Use dotenv.
-            expires_delta=timedelta(minutes=JWT_EXPIRE_MINUTES),
+            expires_delta=timedelta(minutes=ApplicationVariables.JWT_EXPIRE_MINUTES()),
         ),
     )

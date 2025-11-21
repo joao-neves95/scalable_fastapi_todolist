@@ -1,16 +1,11 @@
 from typing import Annotated
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Request
 from fastapi.security import OAuth2PasswordBearer
 from jwt import InvalidTokenError
 from pydantic import AfterValidator
 
-from shared.lib.constants import (
-    AUTH_API_URL,
-    INTERNAL_API_KEY,
-    INTERNAL_API_KEY_HEADER_NAME,
-)
+from shared.clients.auth_client import get_user_credentials_async
 from shared.lib.fastapi_utils import request_is_internal_api_key_valid
 from shared.lib.HTTPException_utils import (
     invalid_credentials_exception,
@@ -30,7 +25,7 @@ from users_api.data.query_utils import (
 
 api_users_router = APIRouter(prefix="/users")
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/openapi/logins")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/logins/openapi")
 
 
 def get_is_user_jwt_admin(token: Annotated[str, Depends(oauth2_scheme)]) -> bool:
@@ -89,13 +84,7 @@ async def get_user(
         token_user_ulid=current_user.ulid, request_user_ulid=current_user.ulid
     )
 
-    async with httpx.AsyncClient() as client:
-        user_credentials_response = await client.get(
-            f"{AUTH_API_URL}/api/v1/auth",
-            headers={INTERNAL_API_KEY_HEADER_NAME: INTERNAL_API_KEY},
-        )
-
-    user_credentials = UserCredentials(**user_credentials_response.json())
+    user_credentials = await get_user_credentials_async(ulid)
     current_user.credentials = UserCredentials(
         user_ulid=current_user.ulid, email=user_credentials.email
     )

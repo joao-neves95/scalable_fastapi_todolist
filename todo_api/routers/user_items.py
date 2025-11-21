@@ -21,7 +21,8 @@ from todo_api.data.entities.data_item import DataItem
 from todo_api.data.mapper_utils import data_item_to_model, update_data_item_from_model
 
 api_user_items_router = APIRouter(prefix="/users/{user_ulid}/items")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/openapi/logins")
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/logins/openapi")
 
 
 # TODO: Add caching here.
@@ -34,12 +35,12 @@ async def get_jwt_user_async(
     except InvalidTokenError:
         raise invalid_credentials_exception
 
-    return (await get_user_by_ulid_async(token_data.sub)).content
+    return (await get_user_by_ulid_async(token_data.sub, token)).content
 
 
 # TODO: add pagination.
 @api_user_items_router.get("/")
-async def get_all_items(
+async def get_all_user_items(
     user_ulid: Annotated[str, Path(), AfterValidator(validate_str_ulid)],
     current_user: Annotated[User, Depends(get_jwt_user_async)],
 ) -> StatusResponse[list[Item]]:
