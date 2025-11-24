@@ -1,6 +1,15 @@
 services:
+  redis_global_cache:
+    container_name: redis_global_cache
+    image: redis:8.4-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+
   auth_api:
     container_name: auth_api
+    depends_on:
+      - redis_global_cache
     build:
       context: .
       dockerfile: auth_api/Dockerfile
@@ -24,6 +33,7 @@ services:
     container_name: users_api
     depends_on:
       - auth_api
+      - redis_global_cache
     build:
       context: .
       dockerfile: users_api/Dockerfile

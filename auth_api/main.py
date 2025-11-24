@@ -14,7 +14,8 @@ app = FastAPI(
             "entities": [
                 "auth_api.data.entities.data_user_credentials",
             ]
-        }
+        },
+        use_redis=True
     ),
     exception_handlers=tortoise_exception_handlers(),
 )

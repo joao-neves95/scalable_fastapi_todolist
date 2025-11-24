@@ -6,13 +6,18 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Path, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jwt import InvalidTokenError
 from pydantic import AfterValidator
+from redis.asyncio import Redis
 from tortoise.transactions import in_transaction
 
-from auth_api.data.entities.data_user_credentials import DataUserCredentials
-from auth_api.data.mapper_utils import data_user_credentials_to_model
-from auth_api.data.query_utils import (
+from auth_api.data.db_query_utils import (
     select_user_credentials_by_email_async,
     select_user_credentials_by_user_ulid_async,
+)
+from auth_api.data.entities.data_user_credentials import DataUserCredentials
+from auth_api.data.mapper_utils import data_user_credentials_to_model
+from auth_api.data.redis_query_utils import (
+    get_cached_user_credentials_async,
+    set_cached_user_credentials_async,
 )
 from shared.clients.users_client import (
     create_user_with_client_async,
@@ -31,6 +36,7 @@ from shared.lib.jwt_utils import (
     decode_token,
     is_user_jwt_admin,
 )
+from shared.lib.redis_utils import get_redis_client_async
 from shared.lib.ulid_validators import validate_str_ulid
 from shared.models.auth_dtos import (
     LoginUser,
@@ -77,15 +83,23 @@ async def get_jwt_user_credentials_async(
     return data_user_credentials_to_model(data_user)
 
 
-# TODO: Make this method private, only accessible inside a private network.
-# TODO: Cache this.
 @api_auth_router.get("/{ulid}")
 async def get_user_credentials(
     ulid: Annotated[str, Path(), AfterValidator(validate_str_ulid)],
     x_internal_api_key: Annotated[str, Header()],
+    redis: Annotated[Redis, Depends(get_redis_client_async)],
 ) -> StatusResponse[UserCredentials]:
     if x_internal_api_key != ApplicationVariables.INTERNAL_API_KEY():
         raise HTTPException(status_code=403, detail="Forbidden")
+
+    user_credentials_json = await get_cached_user_credentials_async(redis, ulid)
+
+    if user_credentials_json:
+        return StatusResponse(
+            status_code=200,
+            message=f"User '{ulid}' found",
+            content=UserCredentials.model_validate_json(user_credentials_json),
+        )
 
     data_user_credentials = await select_user_credentials_by_user_ulid_async(ulid)
 
@@ -95,15 +109,21 @@ async def get_user_credentials(
             message=f"User '{ulid}' not found",
         )
 
+    user_credentials = data_user_credentials_to_model(data_user_credentials)
+    await set_cached_user_credentials_async(redis, ulid, user_credentials)
+
     return StatusResponse(
         status_code=200,
         message=f"User '{ulid}' found",
-        content=data_user_credentials_to_model(data_user_credentials),
+        content=user_credentials,
     )
 
 
 @api_auth_router.post("/", status_code=status.HTTP_201_CREATED)
-async def create_user(register_user_model: RegisterUser) -> StatusResponse:
+async def create_user(
+    register_user_model: RegisterUser,
+    redis: Annotated[Redis, Depends(get_redis_client_async)],
+) -> StatusResponse:
     data_user_credentials = await select_user_credentials_by_email_async(
         register_user_model.email
     )
@@ -120,11 +140,16 @@ async def create_user(register_user_model: RegisterUser) -> StatusResponse:
 
                 (hash, salt) = hash_password(register_user_model.password)
 
-                await DataUserCredentials.create(
+                data_user_credentials = await DataUserCredentials.create(
                     user_ulid=new_user_ulid,
                     email=register_user_model.email,
                     password_hash=hash,
                     salt=salt,
+                )
+
+                user_credentials = data_user_credentials_to_model(data_user_credentials)
+                await set_cached_user_credentials_async(
+                    redis, new_user_ulid, user_credentials
                 )
             except Exception as e:
                 if new_user is not None and new_user_ulid is not None:
@@ -146,6 +171,7 @@ async def update_user_credentials(
     current_data_user_credentials: Annotated[
         DataUserCredentials, Depends(get_jwt_data_user_credentials_async)
     ],
+    redis: Annotated[Redis, Depends(get_redis_client_async)],
 ) -> StatusResponse:
     raise_if_user_has_no_permissions(
         token_user_ulid=current_data_user_credentials.user_ulid,
@@ -155,7 +181,21 @@ async def update_user_credentials(
     (hash, salt) = hash_password(register_user_model.password)
     current_data_user_credentials.password_hash = hash
     current_data_user_credentials.salt = salt
-    await current_data_user_credentials.save()
+
+    async with in_transaction():
+        try:
+            await current_data_user_credentials.save()
+
+            user_credentials = data_user_credentials_to_model(
+                current_data_user_credentials
+            )
+
+            await set_cached_user_credentials_async(redis, user_ulid, user_credentials)
+        except Exception:
+            raise HTTPException(
+                status_code=500,
+                detail="Something went wrong during user credentials update.",
+            )
 
     return StatusResponse(
         status_code=204, message=f"User '{user_ulid}' credentials updated"

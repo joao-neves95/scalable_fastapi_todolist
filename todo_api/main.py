@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from tortoise.contrib.fastapi import tortoise_exception_handlers
 
-from routers.auth import api_auth_router
+from todo_api.routers.auth_proxy import api_auth_router
 from routers.user_items import api_user_items_router
 from shared.lib.fastapi_utils import app_add_cors, app_lifespan
 

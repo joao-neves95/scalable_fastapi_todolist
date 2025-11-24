@@ -2,7 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from tortoise.contrib.fastapi import tortoise_exception_handlers
 
-from routers.auth import api_auth_router
+from users_api.routers.auth_proxy import api_auth_router
 from routers.users import api_users_router
 from shared.lib.fastapi_utils import app_add_cors, app_lifespan
 
@@ -16,6 +16,7 @@ app = FastAPI(
                 "users_api.data.entities.data_user",
             ]
         },
+        use_redis=True,
     ),
     exception_handlers=tortoise_exception_handlers(),
 )
