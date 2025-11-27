@@ -9,6 +9,7 @@ services:
       - todolist_backend
 
   rabbitmq:
+    container_name: rabbitmq
     image: rabbitmq:4-management-alpine
     ports:
       - "5672:5672"
@@ -16,10 +17,25 @@ services:
     networks:
       - todolist_backend
 
+  # Create the exchanges at startup here to avoid IaC.
+  rabbitmq-setup:
+    image: rabbitmq:4-management-alpine
+    depends_on:
+      - rabbitmq
+    networks:
+      - todolist_backend
+    command: >
+      sh -c "until rabbitmqadmin -u guest -p guest -H rabbitmq list vhosts; do sleep 1; done &&
+             echo $'\\nCreating RabbitMQ exchanges...'
+             rabbitmqadmin -u guest -p guest -H rabbitmq declare exchange name=user_credentials type=topic durable=false &&
+             rabbitmqadmin -u guest -p guest -H rabbitmq declare exchange name=users type=topic durable=false &&
+             echo $'\\nDone'"
+
   auth_api:
     container_name: auth_api
     depends_on:
       - redis_global_cache
+      - rabbitmq-setup
     build:
       context: .
       dockerfile: auth_api/Dockerfile.debug
@@ -69,6 +85,7 @@ services:
     container_name: todo_api
     depends_on:
       - users_api
+      - rabbitmq-setup
     build:
       context: .
       dockerfile: todo_api/Dockerfile.debug
