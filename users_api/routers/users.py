@@ -64,7 +64,12 @@ async def get_jwt_user_async(
     token_data: Annotated[JwtTokenData, Depends(get_token_data)],
     redis: Annotated[Redis, Depends(get_redis_client)],
 ) -> User:
-    return await get_cached_user_async(redis, token_data.sub)
+    user = await get_cached_user_async(redis, token_data.sub)
+
+    if not user:
+        user = data_user_to_model(await get_jwt_data_user_async(token_data))
+
+    return user
 
 
 # TODO: add pagination.

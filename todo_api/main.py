@@ -4,8 +4,8 @@ from tortoise.contrib.fastapi import tortoise_exception_handlers
 
 from shared.lib.constants import APP_NAME_TODO_API
 from shared.lib.fastapi_utils import app_add_cors, app_lifespan
-from routers.user_items import api_user_items_router
 from todo_api.routers.auth_proxy import api_auth_router
+from todo_api.routers.user_items import api_user_items_router
 
 load_dotenv()
 

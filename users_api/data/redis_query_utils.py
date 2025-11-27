@@ -4,8 +4,13 @@ from shared.lib.constants import ONE_DAY_IN_SECONDS
 from shared.models.user_dto import User
 
 
-async def get_cached_user_async(redis_client: Redis, user_ulid: str) -> User:
-    return User.model_validate_json(await redis_client.get(f"user:{user_ulid}"))
+async def get_cached_user_async(redis_client: Redis, user_ulid: str) -> User | None:
+    cached_user = await redis_client.get(f"user:{user_ulid}")
+
+    if not cached_user:
+        return None
+
+    return User.model_validate_json(cached_user)
 
 
 async def set_cached_user_async(redis_client: Redis, user_ulid: str, user: User):

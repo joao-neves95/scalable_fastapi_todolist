@@ -33,5 +33,5 @@ class ApplicationVariables:
         return getenv("REDIS_HOST")
 
     @staticmethod
-    def RABBITMQ_URL() -> str | None:
-        return getenv("RABBITMQ_URL")
+    def RABBIT_MQ_URL() -> str | None:
+        return getenv("RABBIT_MQ_URL")

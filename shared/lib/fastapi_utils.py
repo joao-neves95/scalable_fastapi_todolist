@@ -10,6 +10,10 @@ from tortoise.contrib.fastapi import RegisterTortoise
 from shared.lib.application_variables import ApplicationVariables
 from shared.lib.constants import INTERNAL_API_KEY_HEADER_NAME
 from shared.lib.fs_utils import working_dir_endswith
+from shared.lib.rabbitmq_client.rabbitmq_exchange_client import (
+    close_rabbit_mq_exchange_client_async,
+    init_rabbit_mq_exchange_client,
+)
 from shared.lib.redis_utils import close_redis_async, init_redis_client
 
 
@@ -18,6 +22,7 @@ def app_lifespan(
     modules: dict[str, Iterable[str | ModuleType]] | None,
     db_url: str | None = None,
     use_redis: bool = False,
+    use_rabbit_mq: bool = False,
     additional_app_on_init_async: Callable[[FastAPI], Awaitable[None]] | None = None,
     additional_app_on_exit_async: Callable[[FastAPI], Awaitable[None]] | None = None,
 ):
@@ -29,6 +34,12 @@ def app_lifespan(
 
         if use_redis:
             init_redis_client(ApplicationVariables.REDIS_HOST() or "127.0.0.1", 6379)
+
+        if use_rabbit_mq:
+            rabbit_mq_exchange_client = init_rabbit_mq_exchange_client()
+            await rabbit_mq_exchange_client.connect_async(
+                ApplicationVariables.RABBIT_MQ_URL() or ""
+            )
 
         async with RegisterTortoise(
             app=app,
@@ -49,6 +60,8 @@ def app_lifespan(
                 await additional_app_on_exit_async(app)
             if use_redis:
                 await close_redis_async()
+            if use_rabbit_mq:
+                await close_rabbit_mq_exchange_client_async()
 
     return lifespan_async
 

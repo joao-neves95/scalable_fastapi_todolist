@@ -1,5 +1,5 @@
 APP_NAME_AUTH_API = "auth_api"
-APP_NAME_USERS_API = "auth_api"
+APP_NAME_USERS_API = "users_api"
 APP_NAME_TODO_API = "todo_api"
 EXCHANGE_USER_CREDENTIALS = "user_credentials"
 EXCHANGE_USERS = "users"
